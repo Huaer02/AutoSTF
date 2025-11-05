@@ -1,0 +1,49 @@
+data:
+  dataset: bjs_True_True_0_small
+  num_sensors: 270
+  in_length: 12
+  out_length: 12
+  in_channels: 3
+  out_channels: 1
+  batch_size: 32
+
+  train_prop: 0.7
+  valid_prop: 0.1
+
+trainer:
+  early_stop: True
+  early_stop_steps: 20
+  print_frequency: 1
+
+  weight_lr: 0.001
+  weight_lr_decay_milestones: [30,40,50,60]
+  weight_lr_decay_ratio: 0.1
+  weight_decay: 0.0001
+  weight_clip_gradient: 5
+
+  arch_lr: 0.001
+  arch_lr_decay_milestones: [30,40,50,60]
+  arch_lr_decay_ratio: 0.1
+  arch_decay: 0.0003
+  arch_clip_gradient: 5
+
+model:
+  name: bjs_AutoSTF
+  end_channels: 256
+  hidden_channels: 32
+
+  num_mlp_layers: 2
+  scale_num: 3
+
+  IsUseLinear: True
+  num_linear_layers: 3
+
+  layer_names: ['TemporalSearch', 'SpatialSearch']
+
+  num_temporal_search_node: 3
+  temporal_operations: ['DCC_2', 'Informer']
+
+  num_spatial_search_node: 3
+  spatial_operations: ['GNN_fixed', 'GNN_adap', 'GNN_att']
+  num_att_layers: 1
+  num_hop: 1

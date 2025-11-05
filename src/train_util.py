@@ -7,19 +7,22 @@ from scipy.sparse import linalg
 def sym_adj(adj):
     """Symmetrically normalize adjacency matrix."""
     adj = sp.coo_matrix(adj)
-    rowsum = np.array(adj.sum(1))
+    rowsum = np.array(adj.sum(1)).astype(np.float32)  # 确保是浮点数类型
     d_inv_sqrt = np.power(rowsum, -0.5).flatten()
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
+    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.0
+    d_inv_sqrt[np.isnan(d_inv_sqrt)] = 0.0  # 处理NaN值
     d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
     return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).astype(np.float32).todense()
+
 
 def asym_adj(adj):
     """Asymmetrically normalize adjacency matrix."""
     adj = sp.coo_matrix(adj)
-    rowsum = np.array(adj.sum(1)).flatten()
-    d_inv = np.power(rowsum, -1).flatten()
-    d_inv[np.isinf(d_inv)] = 0.
-    d_mat= sp.diags(d_inv)
+    rowsum = np.array(adj.sum(1)).flatten().astype(np.float32)  # 确保是浮点数类型
+    d_inv = np.power(rowsum, -1.0).flatten()  # 使用浮点数指数
+    d_inv[np.isinf(d_inv)] = 0.0
+    d_inv[np.isnan(d_inv)] = 0.0  # 处理NaN值
+    d_mat = sp.diags(d_inv)
     return d_mat.dot(adj).astype(np.float32).todense()
 
 
@@ -33,7 +36,7 @@ def calculate_normalized_laplacian(adj):
     adj = sp.coo_matrix(adj)
     d = np.array(adj.sum(1))
     d_inv_sqrt = np.power(d, -0.5).flatten()
-    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
+    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.0
     d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
     normalized_laplacian = sp.eye(adj.shape[0]) - adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
     return normalized_laplacian
@@ -44,11 +47,11 @@ def calculate_scaled_laplacian(adj_mx, lambda_max=2, undirected=True):
         adj_mx = np.maximum.reduce([adj_mx, adj_mx.T])
     L = calculate_normalized_laplacian(adj_mx)
     if lambda_max is None:
-        lambda_max, _ = linalg.eigsh(L, 1, which='LM')
+        lambda_max, _ = linalg.eigsh(L, 1, which="LM")
         lambda_max = lambda_max[0]
     L = sp.csr_matrix(L)
     M, _ = L.shape
-    I = sp.identity(M, format='csr', dtype=L.dtype)
+    I = sp.identity(M, format="csr", dtype=L.dtype)
     L = (2 / lambda_max * L) - I
     return L.astype(np.float32).todense()
 
@@ -57,11 +60,11 @@ def masked_mse(preds, labels, null_val=np.nan):
     if np.isnan(null_val):
         mask = ~torch.isnan(labels)
     else:
-        mask = (labels!=null_val)
+        mask = labels != null_val
     mask = mask.float()
     mask /= torch.mean((mask))
     mask = torch.where(torch.isnan(mask), torch.zeros_like(mask), mask)
-    loss = (preds-labels)**2
+    loss = (preds - labels) ** 2
     loss = loss * mask
     loss = torch.where(torch.isnan(loss), torch.zeros_like(loss), loss)
     return torch.mean(loss)
@@ -75,11 +78,11 @@ def masked_mae(preds, labels, null_val=np.nan):
     if np.isnan(null_val):
         mask = ~torch.isnan(labels)
     else:
-        mask = (labels != null_val)
+        mask = labels != null_val
     mask = mask.float()
     mask /= torch.mean(mask)
     mask = torch.where(torch.isnan(mask), torch.zeros_like(mask), mask)
-    loss = torch.abs(preds-labels)
+    loss = torch.abs(preds - labels)
     loss = loss * mask
     loss = torch.where(torch.isnan(loss), torch.zeros_like(loss), loss)
     return torch.mean(loss)
@@ -89,11 +92,11 @@ def masked_mape(preds, labels, null_val=np.nan):
     if np.isnan(null_val):
         mask = ~torch.isnan(labels)
     else:
-        mask = (labels != null_val)
+        mask = labels != null_val
     mask = mask.float()
     mask /= torch.mean(mask)
     mask = torch.where(torch.isnan(mask), torch.zeros_like(mask), mask)
-    loss = torch.abs(preds-labels)/labels
+    loss = torch.abs(preds - labels) / labels
     loss = loss * mask
     loss = torch.where(torch.isnan(loss), torch.zeros_like(loss), loss)
     return torch.mean(loss)
@@ -103,7 +106,7 @@ def metric(pred, real):
     mae = masked_mae(pred, real, 0.0).item()
     mape = masked_mape(pred, real, 0.0).item()
     rmse = masked_rmse(pred, real, 0.0).item()
-    return mae,mape,rmse
+    return mae, mape, rmse
 
 
 class Scaler:

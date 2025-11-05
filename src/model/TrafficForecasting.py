@@ -9,23 +9,39 @@ from src.model.mode import Mode
 
 
 def create_layer(name, node_embedding_1=None, node_embedding_2=None, adj_mx=None, config=None, device=None):
-    if name == 'TemporalSearch':
-        return TemporalSearchLayer(node_embedding_1, node_embedding_2, adj_mx, config, device, tag='temporal')
-    if name == 'SpatialSearch':
-        return SpatialSearchLayer(node_embedding_1, node_embedding_2, adj_mx, config, device, tag='spatial')
-    if name == 'ConvPooling':
-        return nn.Conv2d(in_channels=config.hidden_channels, out_channels=config.hidden_channels,
-                         kernel_size=(1, 3), padding=(0, 1), stride=(1, 2))
-    if name == 'AvgPooling':
+    if name == "TemporalSearch":
+        return TemporalSearchLayer(node_embedding_1, node_embedding_2, adj_mx, config, device, tag="temporal")
+    if name == "SpatialSearch":
+        return SpatialSearchLayer(node_embedding_1, node_embedding_2, adj_mx, config, device, tag="spatial")
+    if name == "ConvPooling":
+        return nn.Conv2d(
+            in_channels=config.hidden_channels,
+            out_channels=config.hidden_channels,
+            kernel_size=(1, 3),
+            padding=(0, 1),
+            stride=(1, 2),
+        )
+    if name == "AvgPooling":
         return nn.AvgPool2d(kernel_size=(1, 3), padding=(0, 1), stride=(1, 2))
-    raise Exception('unknown layer name!')
+    raise Exception("unknown layer name!")
 
 
 class AutoSTF(nn.Module):
-    def __init__(self, in_length, out_length,
-                 mask_support_adj, adj_mx, num_sensors,
-                 in_channels, out_channels, hidden_channels, end_channels,
-                 layer_names, config, device):
+    def __init__(
+        self,
+        in_length,
+        out_length,
+        mask_support_adj,
+        adj_mx,
+        num_sensors,
+        in_channels,
+        out_channels,
+        hidden_channels,
+        end_channels,
+        layer_names,
+        config,
+        device,
+    ):
         super(AutoSTF, self).__init__()
 
         self.config = config
@@ -84,26 +100,31 @@ class AutoSTF(nn.Module):
         # feature embeddings
         self.time_series_emb_layer = nn.Conv2d(
             in_channels=self.in_channels * self.in_length,
-            out_channels=self.hidden_channels, kernel_size=(1, 1), bias=True)
+            out_channels=self.hidden_channels,
+            kernel_size=(1, 1),
+            bias=True,
+        )
 
         # fusion layer
         self.hidden_dim = self.hidden_channels + self.mlp_node_dim + self.temp_dim_tid + self.temp_dim_diw
         self.start_encoder = nn.Sequential(
-            *[MultiLayerPerceptron(self.hidden_dim, self.hidden_dim) for _ in range(self.num_mlp_layer)])
+            *[MultiLayerPerceptron(self.hidden_dim, self.hidden_dim) for _ in range(self.num_mlp_layer)]
+        )
         self.fusion_layer = nn.Conv2d(
-            in_channels=self.hidden_dim, out_channels=self.hidden_channels, kernel_size=(1, 1), bias=True)
+            in_channels=self.hidden_dim, out_channels=self.hidden_channels, kernel_size=(1, 1), bias=True
+        )
 
         # self.start_light = nn.Conv2d(in_channels=self.hidden_channels * self.in_length,
         #                                  out_channels=self.hidden_channels,
         #                                  kernel_size=(1, 1), bias=True)
         if self.IsUseLinear:
             self.light_linear_layer = LightLinear(config)
-            self.start_scale_light = nn.Conv2d(in_channels=self.scale_step,
-                                                out_channels=1,
-                                                kernel_size=(1, 1), bias=True)
-            self.start_linear_light = nn.Conv2d(in_channels=self.hidden_channels*2,
-                                                out_channels=self.hidden_channels,
-                                                kernel_size=(1, 1), bias=True)
+            self.start_scale_light = nn.Conv2d(
+                in_channels=self.scale_step, out_channels=1, kernel_size=(1, 1), bias=True
+            )
+            self.start_linear_light = nn.Conv2d(
+                in_channels=self.hidden_channels * 2, out_channels=self.hidden_channels, kernel_size=(1, 1), bias=True
+            )
 
         # Spatial Layer
         mask0 = mask_support_adj[0].detach()
@@ -112,27 +133,42 @@ class AutoSTF(nn.Module):
         self.mask = mask == 0
 
         self.node_vec1 = nn.Parameter(torch.randn(self.config.num_sensors, 10).to(device), requires_grad=True).to(
-            device)
+            device
+        )
         self.node_vec2 = nn.Parameter(torch.randn(10, self.config.num_sensors).to(device), requires_grad=True).to(
-            device)
+            device
+        )
 
         self.TemporalSearchLayers = nn.ModuleList()
         self.SpatialSearchLayers = nn.ModuleList()
         for name in layer_names:
-            if name == 'TemporalSearch':
-                self.TemporalSearchLayers += [create_layer(name,
-                                                           node_embedding_1=self.node_vec1,
-                                                           node_embedding_2=self.node_vec2,
-                                                           adj_mx=adj_mx, config=config, device=device)]
-                self.start_temporal = nn.Conv2d(in_channels=1, out_channels=self.hidden_channels,
-                                                kernel_size=(1, 1), bias=True)
+            if name == "TemporalSearch":
+                self.TemporalSearchLayers += [
+                    create_layer(
+                        name,
+                        node_embedding_1=self.node_vec1,
+                        node_embedding_2=self.node_vec2,
+                        adj_mx=adj_mx,
+                        config=config,
+                        device=device,
+                    )
+                ]
+                self.start_temporal = nn.Conv2d(
+                    in_channels=1, out_channels=self.hidden_channels, kernel_size=(1, 1), bias=True
+                )
                 # self.end_temporal = nn.Conv2d(in_channels=self.in_length, out_channels=1,
                 #                               kernel_size=(1, 1), bias=True)
-            elif name == 'SpatialSearch':
-                self.SpatialSearchLayers += [create_layer(name,
-                                                          node_embedding_1=self.node_vec1,
-                                                          node_embedding_2=self.node_vec2,
-                                                          adj_mx=adj_mx, config=config, device=device)]
+            elif name == "SpatialSearch":
+                self.SpatialSearchLayers += [
+                    create_layer(
+                        name,
+                        node_embedding_1=self.node_vec1,
+                        node_embedding_2=self.node_vec2,
+                        adj_mx=adj_mx,
+                        config=config,
+                        device=device,
+                    )
+                ]
 
         self.spatial_fusion = nn.Linear(self.hidden_channels * len(self.scale_list), self.hidden_channels)
 
@@ -156,11 +192,31 @@ class AutoSTF(nn.Module):
         if self.useDayTime:
             # day embeddings
             t_i_d_data = history_data[..., 1]
+
+            # 添加调试信息检查数据范围
+            if torch.isnan(t_i_d_data).any() or torch.isinf(t_i_d_data).any():
+                print(f"警告：t_i_d_data包含NaN或Inf值")
+                print(f"  NaN数量: {torch.isnan(t_i_d_data).sum().item()}")
+                print(f"  Inf数量: {torch.isinf(t_i_d_data).sum().item()}")
+
             day_emb = self.time_in_day_emb[(t_i_d_data[:, -1, :] * self.time_of_day_size).type(torch.LongTensor)]
+
+            # t_i_d_indices_raw = t_i_d_data[:, -1, :] * self.time_of_day_size
+            # if t_i_d_indices_raw.min() < 0 or t_i_d_indices_raw.max() >= self.time_of_day_size:
+            #     print(f"警告：时间索引超出范围 [{t_i_d_indices_raw.min():.4f}, {t_i_d_indices_raw.max():.4f}]")
+
+            # t_i_d_indices = torch.clamp(
+            #     t_i_d_indices_raw.long(),
+            #     0, self.time_of_day_size - 1
+            # )
+            # day_emb = self.time_in_day_emb[t_i_d_indices]
         if self.useWeekTime:
             # week embeddings
             d_i_w_data = history_data[..., 2]
             week_emb = self.day_in_week_emb[(d_i_w_data[:, -1, :]).type(torch.LongTensor)]
+            # week_emb = self.day_in_week_emb[(d_i_w_data[:, -1, :] * self.day_of_week_size).type(torch.LongTensor)]
+            d_i_w_indices = torch.clamp((d_i_w_data[:, -1, :]).long(), 0, self.day_of_week_size - 1)
+            week_emb = self.day_in_week_emb[d_i_w_indices]
 
         # feature embedding
         # feature_data = input_data.transpose(1, 3).contiguous()
@@ -192,7 +248,7 @@ class AutoSTF(nn.Module):
         mlp_residual = x
 
         # Temporal Search
-        if 'TemporalSearch' in self.layer_names:
+        if "TemporalSearch" in self.layer_names:
             x_t = inputs[:, 0:1, :, :]
             x_t = self.start_temporal(x_t)
             # x_t = self.TemporalLayer(x_t, self.mask)
@@ -207,8 +263,8 @@ class AutoSTF(nn.Module):
         start_scale = 0
         spatial_embedding = []
         for i in range(len(self.scale_list)):
-            x_scale = x_t[:, start_scale:start_scale+self.scale_step, :, :]
-            start_scale = start_scale+self.scale_step
+            x_scale = x_t[:, start_scale : start_scale + self.scale_step, :, :]
+            start_scale = start_scale + self.scale_step
 
             x_scale = self.start_scale_light(x_scale).squeeze(dim=1)
             # if self.IsUseLinear:
@@ -249,13 +305,13 @@ class AutoSTF(nn.Module):
         adj = sp.coo_matrix(adj)
         rowsum = np.array(adj.sum(1)).flatten()
         d_inv = np.power(rowsum, -1).flatten()
-        d_inv[np.isinf(d_inv)] = 0.
+        d_inv[np.isinf(d_inv)] = 0.0
         d_mat = sp.diags(d_inv)
         return d_mat.dot(adj).astype(np.float32).todense()
 
     def set_mode(self, mode):
         self._mode = mode
-        if 'TemporalSearch' in self.layer_names:
+        if "TemporalSearch" in self.layer_names:
             for l in self.TemporalSearchLayers:
                 l.set_mode(mode)
 
@@ -299,7 +355,7 @@ class AutoSTF(nn.Module):
                     yield p
 
         # Temporal Layer
-        if 'TemporalSearch' in self.layer_names:
+        if "TemporalSearch" in self.layer_names:
             for m in self.TemporalSearchLayers:
                 for p in m.weight_parameters():
                     yield p
@@ -320,7 +376,7 @@ class AutoSTF(nn.Module):
                 yield p
 
     def arch_parameters(self):
-        if 'TemporalSearch' in self.layer_names:
+        if "TemporalSearch" in self.layer_names:
             for m in self.TemporalSearchLayers:
                 for p in m.arch_parameters():
                     yield p
